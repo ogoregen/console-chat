@@ -14,48 +14,52 @@ u32 id;
 
 void onRequest(librg_event* event){
 
-	librg_data_wu32(event->data, 42);
-	librg_log("Requesting connection \n");
+	librg_data_wu32(event->data, 871797);
+	std::cout << "Requesting connection" << std::endl;
 }
 
 void onAcception(librg_event* event){
 
-	librg_log("Connection accepted \n\n");
+	std::cout << "Connection accepted" << std::endl << std::endl;
 	connected = 1;
 }
 
 void onRefusal(librg_event* event){
 
-	librg_log("Connection refused \n");
+	std::cout << "Connection refused" << std::endl;
 }
 
 void onMessage(librg_message* message){ //receive messages
 
 	u32 nameLength = librg_data_ru32(message->data);
 	char* incomingName = new char[nameLength];
-
 	librg_data_rptr(message->data, incomingName, sizeof(char) * nameLength);
 
 	u32 length = librg_data_ru32(message->data);
 	char* incoming = new char[length];
-
 	librg_data_rptr(message->data, incoming, sizeof(char) * length);
 
 	std::cout << incomingName << ": " << incoming << std::endl;
 }
 
-void onMessage2(librg_message* message){ //receive user ID
+void onMessage2(librg_message* message){ //receive client ID
 
 	id = librg_data_ru32(message->data);
 }
 
-void onMessage3(librg_message* message){ //receive message history
+void onMessage3(librg_message* message){ //receive messages to print directly
 
 	u32 length = librg_data_ru32(message->data);
 	char* incoming = new char[length];
 	librg_data_rptr(message->data, incoming, sizeof(char) * length);
 
-	std::cout << incoming << std::endl;
+	std::string h(incoming);
+
+	for(char c: h){
+
+		if(c == 'Ð') std::cout << std::endl; //not the ideal way, but it works
+		else std::cout << c;
+	}
 }
 
 void query(){
@@ -65,14 +69,15 @@ void query(){
 		std::string input;
 		std::getline(std::cin, input);
 
-		auto data = librg_data_init_new();
+		if(input != ""){
 
-		librg_data_wu32(data, id);
-		librg_data_wu32(data, input.length()+1);
-		librg_data_wptr(data, &input[0], sizeof(char) * (input.length()+1));
-
-		librg_message_send_all(&ctx, LIBRG_EVENT_LAST + 2, data->rawptr, librg_data_get_wpos(data));
-		librg_data_free(data);
+			librg_data* data = librg_data_init_new();
+			librg_data_wu32(data, id); //sender ID
+			librg_data_wu32(data, input.length() + 1); //message length
+			librg_data_wptr(data, &input[0], sizeof(char) * (input.length() + 1)); //message
+			librg_message_send_all(&ctx, LIBRG_EVENT_LAST + 2, data->rawptr, librg_data_get_wpos(data));
+			librg_data_free(data);
+		}
 	}
 }
 
@@ -105,29 +110,24 @@ int main(){
 	librg_network_add(&ctx, LIBRG_EVENT_LAST + 2, onMessage2);
 	librg_network_add(&ctx, LIBRG_EVENT_LAST + 3, onMessage3);
 
-	const char* ip = "127.0.0.1";
+	const char* ip = "178.128.196.122";
 	librg_address address;
 	address.host = (char*)ip;
 	address.port = 7779;
-
 	librg_network_start(&ctx, (librg_address)address);
 
 	while(!connected) librg_tick(&ctx); //wait for the connection
 
-	auto data = librg_data_init_new();
-
+	librg_data* data = librg_data_init_new(); 
 	librg_data_wu32(data, name.length() + 1);
 	librg_data_wptr(data, &name[0], sizeof(char) * (name.length() + 1));
-
-	librg_message_send_all(&ctx, LIBRG_EVENT_LAST + 1, data->rawptr, librg_data_get_wpos(data));
+	librg_message_send_all(&ctx, LIBRG_EVENT_LAST + 1, data->rawptr, librg_data_get_wpos(data)); //send user name to the server
 	librg_data_free(data);
 
 	std::thread first(query);   
-
-	while(1){
-
-		librg_tick(&ctx);
-	}
+	while(1) librg_tick(&ctx);
 	first.join();
+	librg_network_stop(&ctx);
+	librg_free(&ctx);
 	return 0;
 }
