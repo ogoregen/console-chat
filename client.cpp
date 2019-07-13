@@ -109,7 +109,7 @@ int main(){
 	librg_network_add(&ctx, LIBRG_EVENT_LAST + 2, onMessage2);
 	librg_network_add(&ctx, LIBRG_EVENT_LAST + 3, onMessage3);
 
-	const char* ip = "178.128.196.122";
+	const char* ip = "127.0.0.1";
 	librg_address address;
 	address.host = (char*)ip;
 	address.port = 7779;
